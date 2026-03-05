@@ -43,22 +43,23 @@ log_info "Testing 'append'..."
 # "default" seems to be a reserved keyword that causes syntax errors in CREATE SCHEMA/TABLE statements
 # even when quoted in some contexts or maybe the mock/backend handles it poorly.
 # The mock server uses an in-memory DuckDB. DuckDB's default catalog is "memory".
-# Let's try using "memory" as the catalog.
+# Also, DuckDB's default schema is "main" (not "public" like Postgres).
+# Let's try using catalog "memory" and schema "main".
 
-${CLI} append --catalog "memory" --schema "public" --table "users" --data '{"id": 1, "name": "Alice"}' | jq .
+${CLI} append --catalog "memory" --schema "main" --table "users" --data '{"id": 1, "name": "Alice"}' | jq .
 
 # 3. Upload
 log_info "Testing 'upload'..."
 echo "id,name
 1,Bob
 2,Charlie" > data.csv
-${CLI} upload --catalog "memory" --schema "public" --table "users" --format "csv" --mode "append" --file "data.csv"
+${CLI} upload --catalog "memory" --schema "main" --table "users" --format "csv" --mode "append" --file "data.csv"
 rm data.csv
 
 # 4. Query (Accumulated)
 log_info "Testing 'query' (accumulated)..."
 # Quote identifiers just in case
-OUTPUT=$(${CLI} query --statement "SELECT * FROM \"memory\".\"public\".\"users\" LIMIT 5")
+OUTPUT=$(${CLI} query --statement "SELECT * FROM \"memory\".\"main\".\"users\" LIMIT 5")
 echo "${OUTPUT}" | jq .
 # Simple check for result structure
 if [[ $(echo "${OUTPUT}" | jq 'type') != "array" && $(echo "${OUTPUT}" | jq 'type') != "object" ]]; then
@@ -68,7 +69,7 @@ fi
 
 # 5. Query (Streamed)
 log_info "Testing 'query' (streamed)..."
-${CLI} query --statement "SELECT * FROM \"memory\".\"public\".\"users\" LIMIT 100" --format ndjson > streamed_output.ndjson
+${CLI} query --statement "SELECT * FROM \"memory\".\"main\".\"users\" LIMIT 100" --format ndjson > streamed_output.ndjson
 # Check if file has lines
 if [[ ! -s streamed_output.ndjson ]]; then
     log_error "Streamed output is empty"
