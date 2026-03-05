@@ -96,7 +96,7 @@ OUTPUT=$(${CLI} query --statement "SELECT * FROM \"memory\".\"main\".\"users\" L
 
 echo "${OUTPUT}" | jq -s .
 # Validate that it is an array (of arrays, since we slurped)
-if [[ $(echo "${OUTPUT}" | jq -s 'type') != "array" ]]; then
+if [[ $(echo "${OUTPUT}" | jq -r -s 'type') != "array" ]]; then
     log_error "Query output is not valid NDJSON (could not slurp)"
     exit 1
 fi
