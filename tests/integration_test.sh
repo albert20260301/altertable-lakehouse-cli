@@ -38,7 +38,19 @@ fi
 log_info "Testing 'validate'..."
 ${CLI} validate --statement "SELECT 1" | jq .
 
-# 2. Query (Accumulated)
+# 2. Append (Create table)
+log_info "Testing 'append'..."
+${CLI} append --catalog "default" --schema "public" --table "users" --data '{"id": 1, "name": "Alice"}' | jq .
+
+# 3. Upload
+log_info "Testing 'upload'..."
+echo "id,name
+1,Bob
+2,Charlie" > data.csv
+${CLI} upload --catalog "default" --schema "public" --table "users" --format "csv" --mode "append" --file "data.csv"
+rm data.csv
+
+# 4. Query (Accumulated)
 log_info "Testing 'query' (accumulated)..."
 OUTPUT=$(${CLI} query --statement "SELECT * FROM users LIMIT 5")
 echo "${OUTPUT}" | jq .
@@ -48,7 +60,7 @@ if [[ $(echo "${OUTPUT}" | jq 'type') != "array" && $(echo "${OUTPUT}" | jq 'typ
     exit 1
 fi
 
-# 3. Query (Streamed)
+# 5. Query (Streamed)
 log_info "Testing 'query' (streamed)..."
 ${CLI} query --statement "SELECT * FROM users LIMIT 100" --format ndjson > streamed_output.ndjson
 # Check if file has lines
@@ -58,16 +70,6 @@ if [[ ! -s streamed_output.ndjson ]]; then
 fi
 head -n 3 streamed_output.ndjson
 rm streamed_output.ndjson
-
-# 4. Append
-log_info "Testing 'append'..."
-${CLI} append --catalog "default" --schema "public" --table "users" --data '{"id": 1, "name": "Alice"}' | jq .
-
-# 5. Upload
-log_info "Testing 'upload'..."
-echo "id,name\n1,Bob\n2,Charlie" > data.csv
-${CLI} upload --catalog "default" --schema "public" --table "users" --format "csv" --mode "append" --file "data.csv"
-rm data.csv
 
 # 6. Get Query
 log_info "Testing 'get-query'..."
