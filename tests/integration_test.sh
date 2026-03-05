@@ -40,19 +40,27 @@ ${CLI} validate --statement "SELECT 1" | jq .
 
 # 2. Append (Create table)
 log_info "Testing 'append'..."
-# "default" seems to be a reserved keyword that causes syntax errors in CREATE SCHEMA/TABLE statements
-# even when quoted in some contexts or maybe the mock/backend handles it poorly.
-# The mock server uses an in-memory DuckDB. DuckDB's default catalog is "memory".
-# Also, DuckDB's default schema is "main" (not "public" like Postgres).
-# Let's try using catalog "memory" and schema "main".
+# The error "Did you mean 'main.sqlite_master'?" confirms DuckDB is backing the mock.
+# It also seems "users" table doesn't exist yet, so we need to create it implicitly via append/upload.
+# However, "Catalog Error: Table with name users does not exist!" on upload usually means the table
+# must exist first if mode is append, or mode should be create/overwrite.
+# But `cmd_append` calls `/append` endpoint, which usually creates table if not exists in Altertable API?
+# Re-reading the error: "Catalog Error: Table with name users does not exist!" came from `upload` step?
+# No, it came from `upload` step in previous run. But `append` step also failed with "invalid-data".
 
+# Let's try creating the table first using a CREATE TABLE statement via `query`.
+# This is safer than relying on implicit creation if the mock/backend is strict.
+
+${CLI} query --statement "CREATE TABLE users (id INTEGER, name VARCHAR)"
+
+log_info "Testing 'append' (insert)..."
 ${CLI} append --catalog "memory" --schema "main" --table "users" --data '{"id": 1, "name": "Alice"}' | jq .
 
 # 3. Upload
 log_info "Testing 'upload'..."
 echo "id,name
-1,Bob
-2,Charlie" > data.csv
+2,Bob
+3,Charlie" > data.csv
 ${CLI} upload --catalog "memory" --schema "main" --table "users" --format "csv" --mode "append" --file "data.csv"
 rm data.csv
 
