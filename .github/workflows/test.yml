@@ -1,0 +1,39 @@
+name: Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    name: Lint (ShellCheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          # Scan everything by default (finds .sh and sh/bash shebangs)
+          severity: warning
+  
+  test:
+    name: Integration Test (Mock)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: sudo apt-get install -y curl jq
+
+      - name: Verify executable
+        run: |
+          if [ -f "bin/altertable" ]; then
+            chmod +x bin/altertable
+            ./bin/altertable --version
+            ./bin/altertable --help
+          else
+            echo "Binary not found, skipping (workflow-only PR)"
+          fi
