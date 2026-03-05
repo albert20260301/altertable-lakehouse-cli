@@ -44,14 +44,9 @@ jobs:
 
       - name: Verify executable
         run: |
-          if [ -f "bin/altertable" ]; then
-            chmod +x bin/altertable
-            ./bin/altertable --version
-            ./bin/altertable --help
-          else
-            echo "Binary not found!"
-            exit 1
-          fi
+          chmod +x bin/altertable
+          ./bin/altertable --version
+          ./bin/altertable --help
 
       - name: Run Integration Tests
         run: ./tests/integration_test.sh

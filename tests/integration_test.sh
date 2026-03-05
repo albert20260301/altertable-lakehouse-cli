@@ -70,44 +70,33 @@ ${CLI} upload --catalog "default" --schema "public" --table "users" --format "cs
 rm data.csv
 
 # 6. Get Query
-# We need a query ID. The mock might return one in the query response if we parse it,
-# but for now we can just test with a random UUID if the mock supports looking up 'any' or specific ones.
-# The spec says "verifying the query log response".
-# The mock likely stores queries it receives.
-# Let's try to get a random UUID or one we saw (parsing previous output is harder in bash without complex jq).
-# Assuming mock returns 404 for random UUID but 200 for valid.
-# For this test, let's just run it and expect a response (even 404 is a valid HTTP response from CLI, 
-# though CLI might exit 1 on 404. Let's see how CLI handles errors).
-# If CLI exits 1 on 404, we might need to handle that.
-# The mock usually creates a predictable ID or we can't easily guess it.
-# Let's skip precise ID verification unless we can parse it from a previous response.
-# The CLI 'query' command returns the result rows, not the query metadata (unless --verbose or similar).
-# Actually, the 'query' command returns accumulated rows.
-# To get an ID, we might need to check how the mock behaves or use the async query API if supported?
-# Wait, the spec says "one getQuery call".
-# If we can't easily get a real ID, we'll test with a dummy one and expect a 404, validating the CLI handles it?
-# Or better, does the mock have a fixed ID for testing?
-# Let's use a dummy UUID. The CLI should output the error and exit 1. 
-# To make the test pass, we can allow failure for this specific command if it's just checking connectivity/marshaling.
-# OR, we assume the mock records the last query?
-# Let's try to fetch a query log. If it fails (404), that's technically "working" for the CLI (it made the request).
-set +e
-${CLI} get-query "00000000-0000-0000-0000-000000000000"
-RET=$?
-set -e
-if [[ $RET -ne 0 && $RET -ne 1 ]]; then
-    # Exit code 1 is expected for 404/error. standard bash/curl error is what we want to avoid (crash).
-    log_error "get-query failed with unexpected exit code $RET"
+log_info "Testing 'get-query'..."
+# Run a query to get an ID. Metadata is in the first line of NDJSON output.
+${CLI} query --statement "SELECT 1" --format ndjson > query_meta.ndjson
+QUERY_ID=$(head -n 1 query_meta.ndjson | jq -r .query_id)
+rm query_meta.ndjson
+
+if [[ -z "$QUERY_ID" || "$QUERY_ID" == "null" ]]; then
+    log_error "Failed to extract query_id from metadata"
     exit 1
 fi
-log_info "get-query ran (outcome depends on mock state)"
+
+log_info "Got Query ID: ${QUERY_ID}"
+${CLI} get-query "${QUERY_ID}" | jq .
 
 # 7. Cancel Query
 log_info "Testing 'cancel'..."
+# Try to cancel the query we just ran (it might be finished, but the API should handle it)
+# We use the same QUERY_ID.
 set +e
-${CLI} cancel --query-id "00000000-0000-0000-0000-000000000000" --session-id "session-123"
+${CLI} cancel --query-id "${QUERY_ID}" --session-id "session-integration-test"
 RET=$?
 set -e
-log_info "cancel ran"
+
+if [[ $RET -ne 0 ]]; then
+    log_info "Cancel returned non-zero (expected if query already finished), but command ran."
+else
+    log_info "Cancel command succeeded."
+fi
 
 log_info "All integration tests completed."
