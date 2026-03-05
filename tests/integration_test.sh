@@ -40,27 +40,25 @@ ${CLI} validate --statement "SELECT 1" | jq .
 
 # 2. Append (Create table)
 log_info "Testing 'append'..."
-# Use "memory" catalog which usually exists in DuckDB/Altertable mock environments by default,
-# or stick to "default" but quote it if necessary. The error "Catalog 'my_catalog' does not exist" suggests
-# we need to use a valid catalog.
-# Let's revert to "default" but assume the previous error "syntax error at or near default"
-# was due to something else or strict SQL parsing of "default" as a keyword.
-# We will quote identifiers to be safe: "default"."public"."users"
+# "default" seems to be a reserved keyword that causes syntax errors in CREATE SCHEMA/TABLE statements
+# even when quoted in some contexts or maybe the mock/backend handles it poorly.
+# The mock server uses an in-memory DuckDB. DuckDB's default catalog is "memory".
+# Let's try using "memory" as the catalog.
 
-${CLI} append --catalog "default" --schema "public" --table "users" --data '{"id": 1, "name": "Alice"}' | jq .
+${CLI} append --catalog "memory" --schema "public" --table "users" --data '{"id": 1, "name": "Alice"}' | jq .
 
 # 3. Upload
 log_info "Testing 'upload'..."
 echo "id,name
 1,Bob
 2,Charlie" > data.csv
-${CLI} upload --catalog "default" --schema "public" --table "users" --format "csv" --mode "append" --file "data.csv"
+${CLI} upload --catalog "memory" --schema "public" --table "users" --format "csv" --mode "append" --file "data.csv"
 rm data.csv
 
 # 4. Query (Accumulated)
 log_info "Testing 'query' (accumulated)..."
-# Quote identifiers to handle "default" keyword if it is reserved
-OUTPUT=$(${CLI} query --statement "SELECT * FROM \"default\".\"public\".\"users\" LIMIT 5")
+# Quote identifiers just in case
+OUTPUT=$(${CLI} query --statement "SELECT * FROM \"memory\".\"public\".\"users\" LIMIT 5")
 echo "${OUTPUT}" | jq .
 # Simple check for result structure
 if [[ $(echo "${OUTPUT}" | jq 'type') != "array" && $(echo "${OUTPUT}" | jq 'type') != "object" ]]; then
@@ -70,7 +68,7 @@ fi
 
 # 5. Query (Streamed)
 log_info "Testing 'query' (streamed)..."
-${CLI} query --statement "SELECT * FROM \"default\".\"public\".\"users\" LIMIT 100" --format ndjson > streamed_output.ndjson
+${CLI} query --statement "SELECT * FROM \"memory\".\"public\".\"users\" LIMIT 100" --format ndjson > streamed_output.ndjson
 # Check if file has lines
 if [[ ! -s streamed_output.ndjson ]]; then
     log_error "Streamed output is empty"
